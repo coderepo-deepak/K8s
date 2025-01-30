@@ -19,7 +19,7 @@ resource "aws_launch_template" "eks_launch_template" {
     device_name = "/dev/xvda" # Default root volume for Amazon Linux 2
 
     ebs {
-      volume_size           = 20
+      volume_size           = 20  # <------ Disk size defined here
       volume_type           = "gp3"
       encrypted             = true
       kms_key_id            = aws_kms_key.eks_ebs_key.arn
@@ -54,10 +54,10 @@ resource "aws_eks_node_group" "node_group" {
 
   ami_type      = "AL2_x86_64"
   capacity_type = "ON_DEMAND"
-  disk_size     = 20
   force_update_version = false
   instance_types = ["t3.small"]
 
+  # Attach launch template
   launch_template {
     id      = aws_launch_template.eks_launch_template.id
     version = "$Latest"
