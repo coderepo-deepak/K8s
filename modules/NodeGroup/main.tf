@@ -1,50 +1,37 @@
-# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eks_node_group
+# Create a dedicated KMS key for EBS encryption
+resource "aws_kms_key" "eks_ebs_key" {
+  description             = "KMS key for encrypting EBS volumes in EKS Node Group"
+  enable_key_rotation     = true
+  deletion_window_in_days = 7
+}
 
+# Attach an alias to the KMS key (optional but recommended)
+resource "aws_kms_alias" "eks_ebs_key_alias" {
+  name          = "alias/eks-ebs-key"
+  target_key_id = aws_kms_key.eks_ebs_key.key_id
+}
+
+# Modify your existing EKS Node Group to use the new KMS Key
 resource "aws_eks_node_group" "node_group" {
-  # Name of the EKS Cluster
-  cluster_name = var.EKS_CLUSTER_NAME
-
-  # Name of the EKS Node Group.
+  cluster_name    = var.EKS_CLUSTER_NAME
   node_group_name = "${var.EKS_CLUSTER_NAME}-node_group"
-
-  # Amazon Resource Name (ARN) of the IAM Role that provides permissions for the EKS Node Group.
-  node_role_arn = var.NODE_GROUP_ARN
-
-  # Identifiers of EC2 Subnets to associate with the EKS Node Group. 
-  # These subnets must have the following resource tag: kubernetes.io/cluster/EKS_CLUSTER_NAME 
+  node_role_arn   = var.NODE_GROUP_ARN
 
   subnet_ids = [
     var.PRI_SUB3_ID,
     var.PRI_SUB4_ID
   ]
 
-  # Configuration block
   scaling_config {
-    # Required number of worker nodes
     desired_size = 2
-
-    # Maximum number of worker nodes
-    max_size = 2
-
-    # Minimum number of worker nodes
-    min_size = 2
+    max_size     = 2
+    min_size     = 2
   }
 
-  # Type of Amazon Machine Image (AMI) associated with the EKS Node Group
- 
-  ami_type = "AL2_x86_64"
-
-  # Type of capacity associated with the EKS Node Group
-
+  ami_type      = "AL2_x86_64"
   capacity_type = "ON_DEMAND"
-
-  # Disk size in GB for worker nodes
-  disk_size = 20
-
-  # Force version update if existing pods are unable to be drained due to a pod disruption budget issue
+  disk_size     = 20
   force_update_version = false
-
-  # Instance type associated with the EKS Node Group
   instance_types = ["t3.small"]
 
   labels = {
@@ -52,6 +39,13 @@ resource "aws_eks_node_group" "node_group" {
     name = "${var.EKS_CLUSTER_NAME}-node_group"
   }
 
-  # Kubernetes version
   version = "1.27"
+
+  # Enable EBS encryption using the KMS key
+  encryption_config {
+    resources = ["secrets"]
+    provider {
+      key_arn = aws_kms_key.eks_ebs_key.arn
+    }
+  }
 }
